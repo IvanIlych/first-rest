@@ -2,13 +2,24 @@
 from flask import Flask, jsonify, abort, make_response, request, url_for
 from flask_httpauth import HTTPBasicAuth
 import json
-import config
+import configparser
+import sys
+import datetime
 
 auth = HTTPBasicAuth()
 
 app = Flask(__name__)
 
-with open('tasks.json') as json_file:
+config = configparser.ConfigParser()
+
+
+try:
+    config.read(sys.argv[1])
+except:
+    print("no valid config files found, aborting")
+    exit(-1)
+
+with open(config['APP']['db_file']) as json_file:
     tasks = json.load(json_file)
 
 
@@ -31,6 +42,7 @@ def get_tasks():
     new_tasks = []
     for task in tasks:
         new_tasks.append(make_public_task(task))
+    add_log_entry("Showed list of tasks")
     return jsonify({'tasks': new_tasks})
 
 
@@ -40,6 +52,7 @@ def get_task(task_id):
     task = list(filter(lambda t: t['id'] == task_id, tasks))
     if len(task) == 0:
         abort(404)
+    add_log_entry("Showed details of task " + str(task_id))
     return jsonify({'task': task[0]})
 
 
@@ -57,8 +70,9 @@ def create_task():
         'done': False
     }
     tasks.append(task)
-    with open('tasks.json', 'w') as outfile:
+    with open(config['APP']['db_file'], 'w') as outfile:
         json.dump(tasks, outfile)
+    add_log_entry("Task " + str(task['id']) + " was added")
     return jsonify({'task': task}), 201
 
 
@@ -69,8 +83,9 @@ def delete_task(task_id):
     if len(task) == 0:
         abort(404)
     tasks.remove(task[0])
-    with open('tasks.json', 'w') as outfile:
+    with open(config['APP']['db_file'], 'w') as outfile:
         json.dump(tasks, outfile)
+    add_log_entry("Task " + str(task_id) + " was removed")
     return jsonify({'result': True})
 
 
@@ -94,26 +109,35 @@ def update_task(task_id):
         task[0]['dir_dest'] = request.json.get('dir_dest', task[0]['dir_dest'])
     if 'done' in request.json:
         task[0]['done'] = request.json.get('done', task[0]['done'])
-    with open('tasks.json', 'w') as outfile:
+    with open(config['APP']['db_file'], 'w') as outfile:
             json.dump(tasks, outfile)
+    add_log_entry("Task "+str(task_id)+" was updated")
     return jsonify({'task': task[0]})
 
 
 @app.errorhandler(404)
 def not_found(error):
+    add_log_entry('Not found')
     return make_response(jsonify({'error': 'Not found'}), 404)
 
 
 @auth.get_password
 def get_password(username):
-    if username == config.username:
-        return config.password
+    if username == config['APP']['username']:
+        return config['APP']['password']
     return None
 
 
 @auth.error_handler
 def unauthorized():
     return make_response(jsonify({'error': 'Unauthorized access'}), 401)
+
+
+def add_log_entry(entry):
+    with open(config['APP']['log_dir']+'/log.log', 'a') as logfile:
+        now = datetime.datetime.now()
+        entry = now.strftime("%Y-%m-%d %H:%M:%S ")+entry+'\n'
+        logfile.write(entry)
 
 
 if __name__ == '__main__':
