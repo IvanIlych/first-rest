@@ -5,6 +5,7 @@ import json
 import configparser
 import sys
 import datetime
+import os
 
 auth = HTTPBasicAuth()
 
