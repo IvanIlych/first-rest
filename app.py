@@ -136,7 +136,7 @@ def unauthorized():
 def add_log_entry(entry):
     with open(config['APP']['log_dir']+'/log.log', 'a') as logfile:
         now = datetime.datetime.now()
-        entry = now.strftime("%Y-%m-%d %H:%M:%S ")+entry+'\n'
+        entry = now.strftime("%Y-%m-%d %H:%M:%S ")+entry+" ; processed by "+os.uname().nodename+'\n'
         logfile.write(entry)
 
 
